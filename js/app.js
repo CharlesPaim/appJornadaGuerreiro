@@ -61,6 +61,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         confirmMessage: document.getElementById('confirm-message'),
         confirmConfirmBtn: document.getElementById('confirm-confirm-btn'),
         confirmCancelBtn: document.getElementById('confirm-cancel-btn'),
+        addExerciseBtn: document.getElementById('add-exercise-btn'),
+        exerciseModal: document.getElementById('exercise-modal'),
+        exerciseModalTitle: document.getElementById('exercise-modal-title'),
+        exerciseForm: document.getElementById('exercise-form'),
+        exerciseNameInput: document.getElementById('exercise-name'),
+        exerciseTypeSelect: document.getElementById('exercise-type'),
+        exerciseMonthlyGoalInput: document.getElementById('exercise-monthly-goal'),
+        cancelExerciseBtn: document.getElementById('cancel-exercise-btn'),
+        exerciseModalError: document.getElementById('exercise-modal-error'),
     };
 
     const showConfirmation = ({
@@ -132,7 +141,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     };
 
-    let baseExercises = [
+    const baseExercises = [
         { id: 'abdominais', name: 'Abdominais', t: 'reps', monthlyGoal: 6000 },
         { id: 'agachamentos', name: 'Agachamentos', t: 'reps', monthlyGoal: 3000 },
         { id: 'flexoes', name: 'Flexões', t: 'reps', monthlyGoal: 3000 },
@@ -155,6 +164,45 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentWorkout: [],
         sessionLog: {},
         timerDetails: { timeLeft: 0, totalDuration: 0 }
+    };
+
+    let editingExerciseId = null;
+
+    const isBaseExercise = (id) => baseExercises.some(ex => ex.id === id);
+    const getCustomExercises = () => Array.isArray(appData.customExercises) ? appData.customExercises : [];
+    const getAllExercises = () => [...baseExercises, ...getCustomExercises()];
+    const getExerciseById = (id) => getAllExercises().find(ex => ex.id === id);
+    const getOrderedExercises = () => {
+        const exercisesMap = new Map();
+        getAllExercises().forEach(ex => exercisesMap.set(ex.id, ex));
+        const ordered = [];
+        const order = Array.isArray(appData.exerciseOrder) ? [...appData.exerciseOrder] : [];
+
+        order.forEach(id => {
+            if (exercisesMap.has(id)) {
+                ordered.push(exercisesMap.get(id));
+                exercisesMap.delete(id);
+            }
+        });
+
+        exercisesMap.forEach(ex => ordered.push(ex));
+        return ordered;
+    };
+
+    const generateExerciseId = (name) => {
+        const normalized = (name || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        const slug = normalized || 'exercicio';
+        const existingIds = new Set(getAllExercises().map(ex => ex.id));
+        let candidate = `custom-${slug}-${Date.now()}`;
+        while (existingIds.has(candidate)) {
+            candidate = `custom-${slug}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        }
+        return candidate;
     };
 
     let synth, speech;
@@ -187,6 +235,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const today = new Date();
         const currentMonth = today.getMonth() + 1;
         const currentYear = today.getFullYear();
+        let dataChanged = false;
 
         if (savedData) {
             appData = JSON.parse(savedData);
@@ -214,11 +263,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                             history: appData.history
                         };
                         appData.history = {};
+                        dataChanged = true;
                     }
                 }
 
                 appData.currentChallenge = { year: currentYear, month: currentMonth };
-                saveData();
+                dataChanged = true;
             }
         } else {
             appData = {
@@ -226,6 +276,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 monthlyGoals: {},
                 history: {},
                 archive: {},
+                customExercises: [],
                 exerciseOrder: baseExercises.map(ex => ex.id),
                 dailySettings: {
                     cycles: 3,
@@ -237,25 +288,92 @@ document.addEventListener('DOMContentLoaded', async () => {
             baseExercises.forEach(ex => {
                 appData.monthlyGoals[ex.id] = ex.monthlyGoal;
             });
-            saveData();
+            dataChanged = true;
         }
 
-        if (!appData.dailySettings) appData.dailySettings = {};
-        if (typeof appData.dailySettings.cycles !== 'number') appData.dailySettings.cycles = 3;
-        if (typeof appData.dailySettings.restTime !== 'number') appData.dailySettings.restTime = 15;
-        if (typeof appData.dailySettings.seriesRestTime !== 'number') appData.dailySettings.seriesRestTime = 30;
-        if (!appData.dailySettings.enabledExercises || typeof appData.dailySettings.enabledExercises !== 'object') {
-            appData.dailySettings.enabledExercises = {};
+        if (!Array.isArray(appData.customExercises)) {
+            appData.customExercises = [];
+            dataChanged = true;
         }
-        baseExercises.forEach(ex => {
-            if (typeof appData.dailySettings.enabledExercises[ex.id] === 'undefined') {
-                appData.dailySettings.enabledExercises[ex.id] = ['abdominais', 'agachamentos', 'flexoes'].includes(ex.id);
+
+        if (!appData.monthlyGoals || typeof appData.monthlyGoals !== 'object') {
+            appData.monthlyGoals = {};
+            dataChanged = true;
+        }
+
+        if (!Array.isArray(appData.exerciseOrder)) {
+            appData.exerciseOrder = [];
+            dataChanged = true;
+        }
+
+        const allExercises = getAllExercises();
+        const allIds = allExercises.map(ex => ex.id);
+        const validIds = new Set(allIds);
+
+        const originalOrderLength = appData.exerciseOrder.length;
+        appData.exerciseOrder = appData.exerciseOrder.filter(id => validIds.has(id));
+        if (appData.exerciseOrder.length !== originalOrderLength) {
+            dataChanged = true;
+        }
+        allIds.forEach(id => {
+            if (!appData.exerciseOrder.includes(id)) {
+                appData.exerciseOrder.push(id);
+                dataChanged = true;
             }
         });
-        saveData();
 
-        if (appData.exerciseOrder) {
-            baseExercises.sort((a, b) => appData.exerciseOrder.indexOf(a.id) - appData.exerciseOrder.indexOf(b.id));
+        Object.keys(appData.monthlyGoals).forEach(id => {
+            if (!validIds.has(id)) {
+                delete appData.monthlyGoals[id];
+                dataChanged = true;
+            }
+        });
+        allExercises.forEach(ex => {
+            if (typeof appData.monthlyGoals[ex.id] !== 'number') {
+                appData.monthlyGoals[ex.id] = ex.monthlyGoal || 0;
+                dataChanged = true;
+            }
+        });
+
+        if (!appData.dailySettings || typeof appData.dailySettings !== 'object') {
+            appData.dailySettings = {};
+            dataChanged = true;
+        }
+        if (typeof appData.dailySettings.cycles !== 'number') {
+            appData.dailySettings.cycles = 3;
+            dataChanged = true;
+        }
+        if (typeof appData.dailySettings.restTime !== 'number') {
+            appData.dailySettings.restTime = 15;
+            dataChanged = true;
+        }
+        if (typeof appData.dailySettings.seriesRestTime !== 'number') {
+            appData.dailySettings.seriesRestTime = 30;
+            dataChanged = true;
+        }
+        if (!appData.dailySettings.enabledExercises || typeof appData.dailySettings.enabledExercises !== 'object') {
+            appData.dailySettings.enabledExercises = {};
+            dataChanged = true;
+        }
+
+        const enabledExercises = appData.dailySettings.enabledExercises;
+        Object.keys(enabledExercises).forEach(id => {
+            if (!validIds.has(id)) {
+                delete enabledExercises[id];
+                dataChanged = true;
+            }
+        });
+        allExercises.forEach(ex => {
+            if (typeof enabledExercises[ex.id] === 'undefined') {
+                enabledExercises[ex.id] = isBaseExercise(ex.id)
+                    ? ['abdominais', 'agachamentos', 'flexoes'].includes(ex.id)
+                    : true;
+                dataChanged = true;
+            }
+        });
+
+        if (dataChanged) {
+            saveData();
         }
     };
 
@@ -313,7 +431,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const getDailyWorkout = () => {
         const selected = [];
         const seriesCount = parseInt(document.querySelector('input[name="cycles"]:checked').value, 10) || 1;
-        baseExercises.forEach(ex => {
+        getOrderedExercises().forEach(ex => {
             const checkbox = document.getElementById(`check-daily-${ex.id}`);
             if (checkbox && checkbox.checked) {
                 const input = document.getElementById(`input-daily-${ex.id}`);
@@ -361,7 +479,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const selectedRadio = document.querySelector('input[name="days-in-month"]:checked');
         const days = selectedRadio ? parseInt(selectedRadio.value, 10) : 31;
 
-        baseExercises.forEach(ex => {
+        getOrderedExercises().forEach(ex => {
             const monthlyInput = document.getElementById(`input-monthly-${ex.id}`);
             const dailyInput = document.getElementById(`input-daily-${ex.id}`);
             const perSeriesSpan = document.getElementById(`per-series-${ex.id}`);
@@ -380,8 +498,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const updateProgressDisplay = () => {
         ui.monthlyProgressContainer.innerHTML = '';
+        const exercises = getOrderedExercises();
         const monthlyTotals = {};
-        baseExercises.forEach(ex => monthlyTotals[ex.id] = 0);
+        exercises.forEach(ex => monthlyTotals[ex.id] = 0);
 
         const trainingDays = Object.keys(appData.history).length;
 
@@ -397,9 +516,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        baseExercises.forEach(ex => {
-            const goal = appData.monthlyGoals[ex.id] || 0;
-            const done = monthlyTotals[ex.id];
+        exercises.forEach(ex => {
+            const goal = appData.monthlyGoals[ex.id] || ex.monthlyGoal || 0;
+            const done = monthlyTotals[ex.id] || 0;
             const remaining = goal - done;
             const average = trainingDays > 0 ? Math.ceil(done / trainingDays) : 0;
             const progressEl = document.createElement('div');
@@ -421,14 +540,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         ui.monthlyGoalsContainer.innerHTML = '';
         ui.exerciseSelectionContainer.innerHTML = '';
 
-        baseExercises.forEach(ex => {
+        getOrderedExercises().forEach(ex => {
             const unit = ex.t === 'reps' ? 'reps' : 's';
+            const isCustom = !isBaseExercise(ex.id);
+            const monthlyGoalValue = typeof appData.monthlyGoals[ex.id] === 'number'
+                ? appData.monthlyGoals[ex.id]
+                : (ex.monthlyGoal || 0);
+
             const monthlyEl = document.createElement('div');
-            monthlyEl.className = 'flex items-center justify-between';
+            monthlyEl.className = 'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2';
+            monthlyEl.dataset.id = ex.id;
             monthlyEl.innerHTML = `
-                <label for="input-monthly-${ex.id}" class="text-white">${ex.name}</label>
                 <div class="flex items-center">
-                    <input type="number" id="input-monthly-${ex.id}" value="${appData.monthlyGoals[ex.id] || ex.monthlyGoal}" class="w-24 bg-gray-900 border border-gray-600 rounded-md p-1 text-center focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <label for="input-monthly-${ex.id}" class="text-white">${ex.name}</label>
+                    ${isCustom ? `
+                        <div class="flex items-center ml-3 space-x-2">
+                            <button type="button" data-exercise-action="edit" data-id="${ex.id}" class="exercise-action text-xs text-indigo-400 hover:text-indigo-200">Editar</button>
+                            <button type="button" data-exercise-action="remove" data-id="${ex.id}" class="exercise-action text-xs text-red-400 hover:text-red-200">Remover</button>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="flex items-center">
+                    <input type="number" id="input-monthly-${ex.id}" value="${monthlyGoalValue}" class="w-24 bg-gray-900 border border-gray-600 rounded-md p-1 text-center focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                     <span class="ml-2 text-gray-400 w-8">${unit}</span>
                 </div>
             `;
@@ -439,10 +572,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             dailyEl.className = 'flex flex-col sm:flex-row sm:items-center sm:justify-between bg-gray-900/50 p-3 rounded-md exercise-item';
             dailyEl.dataset.id = ex.id;
             dailyEl.innerHTML = `
-                <div class="flex items-center w-full sm:w-auto">
+                <div class="flex items-center w-full sm:w-auto flex-wrap">
                     <span class="drag-handle hidden cursor-move mr-3">☰</span>
                     <input id="check-daily-${ex.id}" type="checkbox" class="custom-checkbox h-5 w-5 rounded bg-gray-700 border-gray-600 text-indigo-600 focus:ring-indigo-500" ${isChecked}>
                     <label for="check-daily-${ex.id}" class="ml-3 text-white">${ex.name}</label>
+                    ${isCustom ? `
+                        <div class="flex items-center ml-3 space-x-2">
+                            <button type="button" data-exercise-action="edit" data-id="${ex.id}" class="exercise-action text-xs text-indigo-400 hover:text-indigo-200">Editar</button>
+                            <button type="button" data-exercise-action="remove" data-id="${ex.id}" class="exercise-action text-xs text-red-400 hover:text-red-200">Remover</button>
+                        </div>
+                    ` : ''}
                 </div>
                 <div class="flex items-center w-full sm:w-auto mt-2 sm:mt-0 justify-end">
                     <input type="number" id="input-daily-${ex.id}" value="0" class="w-20 bg-gray-700 border border-gray-600 rounded-md p-1 text-center focus:ring-2 focus:ring-indigo-500 focus:outline-none">
@@ -454,6 +593,137 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
             ui.exerciseSelectionContainer.appendChild(dailyEl);
         });
+    };
+
+    const closeExerciseModal = () => {
+        if (ui.exerciseModal) {
+            ui.exerciseModal.classList.add('hidden');
+        }
+        if (ui.exerciseForm) {
+            ui.exerciseForm.reset();
+        }
+        if (ui.exerciseModalError) {
+            ui.exerciseModalError.textContent = '';
+        }
+        editingExerciseId = null;
+    };
+
+    const openExerciseModal = (exercise = null) => {
+        if (!ui.exerciseModal) return;
+
+        editingExerciseId = exercise ? exercise.id : null;
+        if (ui.exerciseModalTitle) {
+            ui.exerciseModalTitle.textContent = exercise ? 'Editar Exercício' : 'Novo Exercício';
+        }
+        if (ui.exerciseNameInput) {
+            ui.exerciseNameInput.value = exercise ? exercise.name : '';
+        }
+        if (ui.exerciseTypeSelect) {
+            ui.exerciseTypeSelect.value = exercise ? (exercise.t === 'time' ? 'time' : 'reps') : 'reps';
+        }
+        if (ui.exerciseMonthlyGoalInput) {
+            const goalValue = exercise ? (appData.monthlyGoals[exercise.id] ?? exercise.monthlyGoal ?? 0) : '';
+            ui.exerciseMonthlyGoalInput.value = goalValue !== '' ? goalValue : '';
+        }
+        if (ui.exerciseModalError) {
+            ui.exerciseModalError.textContent = '';
+        }
+
+        ui.exerciseModal.classList.remove('hidden');
+        setTimeout(() => {
+            if (ui.exerciseNameInput) ui.exerciseNameInput.focus();
+        }, 0);
+    };
+
+    const removeCustomExercise = async (exerciseId) => {
+        if (!exerciseId || isBaseExercise(exerciseId)) return;
+        const customExercise = getCustomExercises().find(ex => ex.id === exerciseId);
+        if (!customExercise) return;
+
+        const confirmed = await showConfirmation({
+            title: 'Remover exercício',
+            message: `Deseja remover "${customExercise.name}" e seus ajustes personalizados?`,
+            confirmText: 'Remover',
+            cancelText: 'Cancelar',
+            variant: 'danger'
+        });
+
+        if (!confirmed) return;
+
+        appData.customExercises = getCustomExercises().filter(ex => ex.id !== exerciseId);
+        if (appData.monthlyGoals && appData.monthlyGoals.hasOwnProperty(exerciseId)) {
+            delete appData.monthlyGoals[exerciseId];
+        }
+        if (appData.dailySettings && appData.dailySettings.enabledExercises) {
+            delete appData.dailySettings.enabledExercises[exerciseId];
+        }
+        if (Array.isArray(appData.exerciseOrder)) {
+            appData.exerciseOrder = appData.exerciseOrder.filter(id => id !== exerciseId);
+        }
+        if (editingExerciseId === exerciseId) {
+            editingExerciseId = null;
+        }
+
+        saveData();
+        renderSetupScreen();
+        calculateDailyGoals();
+        updateProgressDisplay();
+    };
+
+    const handleExerciseFormSubmit = (event) => {
+        event.preventDefault();
+        if (!ui.exerciseNameInput || !ui.exerciseTypeSelect || !ui.exerciseMonthlyGoalInput) return;
+
+        const name = ui.exerciseNameInput.value.trim();
+        const type = ui.exerciseTypeSelect.value === 'time' ? 'time' : 'reps';
+        const monthlyGoalValue = parseInt(ui.exerciseMonthlyGoalInput.value, 10);
+
+        if (!name) {
+            if (ui.exerciseModalError) ui.exerciseModalError.textContent = 'Informe um nome para o exercício.';
+            return;
+        }
+        if (!Number.isFinite(monthlyGoalValue) || monthlyGoalValue <= 0) {
+            if (ui.exerciseModalError) ui.exerciseModalError.textContent = 'Defina uma meta mensal válida.';
+            return;
+        }
+
+        if (!Array.isArray(appData.customExercises)) {
+            appData.customExercises = [];
+        }
+        if (!appData.dailySettings || typeof appData.dailySettings !== 'object') {
+            appData.dailySettings = {};
+        }
+        if (!appData.dailySettings.enabledExercises || typeof appData.dailySettings.enabledExercises !== 'object') {
+            appData.dailySettings.enabledExercises = {};
+        }
+        if (!Array.isArray(appData.exerciseOrder)) {
+            appData.exerciseOrder = [];
+        }
+
+        if (editingExerciseId) {
+            const exercise = appData.customExercises.find(ex => ex.id === editingExerciseId);
+            if (exercise) {
+                exercise.name = name;
+                exercise.t = type;
+                exercise.monthlyGoal = monthlyGoalValue;
+                appData.monthlyGoals[editingExerciseId] = monthlyGoalValue;
+            }
+        } else {
+            const id = generateExerciseId(name);
+            const newExercise = { id, name, t: type, monthlyGoal: monthlyGoalValue };
+            appData.customExercises.push(newExercise);
+            appData.monthlyGoals[id] = monthlyGoalValue;
+            appData.dailySettings.enabledExercises[id] = true;
+            if (!appData.exerciseOrder.includes(id)) {
+                appData.exerciseOrder.push(id);
+            }
+        }
+
+        saveData();
+        renderSetupScreen();
+        calculateDailyGoals();
+        updateProgressDisplay();
+        closeExerciseModal();
     };
 
     const logExercise = (exercise, completedValue) => {
@@ -733,6 +1003,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let dataSet;
         let isArchived = false;
+        const exerciseMap = new Map();
+        getAllExercises().forEach(ex => exerciseMap.set(ex.id, ex));
+        const exerciseOrder = Array.isArray(appData.exerciseOrder) ? appData.exerciseOrder : [];
         if (archiveKey) {
             const { year, month } = appData.currentChallenge;
             const currentKey = `${year}-${String(month).padStart(2, '0')}`;
@@ -801,13 +1074,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </button>
                     </div>
                     <ul class="list-disc list-inside text-gray-300">`;
+                const sortedEntries = Object.entries(session.log)
+                    .filter(([, value]) => value > 0)
+                    .sort((a, b) => {
+                        const indexA = exerciseOrder.indexOf(a[0]);
+                        const indexB = exerciseOrder.indexOf(b[0]);
+                        if (indexA === -1 && indexB === -1) return a[0].localeCompare(b[0]);
+                        if (indexA === -1) return 1;
+                        if (indexB === -1) return -1;
+                        return indexA - indexB;
+                    });
 
-                baseExercises.forEach(ex => {
-                    if (session.log.hasOwnProperty(ex.id) && session.log[ex.id] > 0) {
-                        const value = session.log[ex.id];
-                        const unit = ex.t === 'reps' ? 'reps' : 's';
-                        sessionContent += `<li>${ex.name}: ${value} ${unit}</li>`;
-                    }
+                sortedEntries.forEach(([exId, value]) => {
+                    const exercise = exerciseMap.get(exId);
+                    const label = exercise ? exercise.name : exId;
+                    const unit = exercise ? (exercise.t === 'reps' ? 'reps' : 's') : '';
+                    const displayUnit = unit ? ` ${unit}` : '';
+                    sessionContent += `<li>${label}: ${value}${displayUnit}</li>`;
                 });
 
                 sessionContent += '</ul>';
@@ -890,10 +1173,56 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         });
 
+        if (ui.addExerciseBtn) {
+            ui.addExerciseBtn.addEventListener('click', () => openExerciseModal());
+        }
+        if (ui.cancelExerciseBtn) {
+            ui.cancelExerciseBtn.addEventListener('click', (event) => {
+                event.preventDefault();
+                closeExerciseModal();
+            });
+        }
+        if (ui.exerciseForm) {
+            ui.exerciseForm.addEventListener('submit', handleExerciseFormSubmit);
+        }
+        if (ui.exerciseModal) {
+            ui.exerciseModal.addEventListener('click', (event) => {
+                if (event.target === ui.exerciseModal) {
+                    closeExerciseModal();
+                }
+            });
+        }
+
+        const handleExerciseActionClick = async (event) => {
+            const actionBtn = event.target.closest('[data-exercise-action]');
+            if (!actionBtn) return;
+
+            const action = actionBtn.dataset.exerciseAction;
+            const exerciseId = actionBtn.dataset.id;
+            if (!action || !exerciseId || isBaseExercise(exerciseId)) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (action === 'edit') {
+                const exercise = getCustomExercises().find(ex => ex.id === exerciseId);
+                if (exercise) openExerciseModal(exercise);
+            } else if (action === 'remove') {
+                await removeCustomExercise(exerciseId);
+            }
+        };
+
+        if (ui.monthlyGoalsContainer) {
+            ui.monthlyGoalsContainer.addEventListener('click', handleExerciseActionClick);
+        }
+        if (ui.exerciseSelectionContainer) {
+            ui.exerciseSelectionContainer.addEventListener('click', handleExerciseActionClick);
+        }
+
         ui.monthlyGoalsContainer.addEventListener('input', e => {
             if (e.target.id && e.target.id.startsWith('input-monthly-')) {
                 const exerciseId = e.target.id.replace('input-monthly-', '');
-                if (baseExercises.some(ex => ex.id === exerciseId)) {
+                if (getExerciseById(exerciseId)) {
                     appData.monthlyGoals[exerciseId] = parseInt(e.target.value, 10) || 0;
                     saveData();
                     calculateDailyGoals();
@@ -905,7 +1234,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         ui.exerciseSelectionContainer.addEventListener('change', e => {
             if (e.target.id && e.target.id.startsWith('check-daily-')) {
                 const exerciseId = e.target.id.replace('check-daily-', '');
-                if (baseExercises.some(ex => ex.id === exerciseId)) {
+                if (getExerciseById(exerciseId)) {
                     appData.dailySettings.enabledExercises[exerciseId] = e.target.checked;
                     saveData();
                     calculateTotalTime();
@@ -1030,7 +1359,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             ui.retroDateInput.value = today;
             ui.retroDateInput.max = today;
 
-            baseExercises.forEach(ex => {
+            getOrderedExercises().forEach(ex => {
                 const div = document.createElement('div');
                 div.className = 'mb-4';
                 div.innerHTML = `
@@ -1055,9 +1384,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             const retroLog = {};
             let hasData = false;
-            baseExercises.forEach(ex => {
+            getOrderedExercises().forEach(ex => {
                 const input = document.getElementById(`retro-${ex.id}`);
-                const value = parseInt(input.value, 10) || 0;
+                const value = parseInt(input?.value, 10) || 0;
                 if (value > 0) {
                     retroLog[ex.id] = value;
                     hasData = true;
@@ -1091,12 +1420,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             const newOrder = [...document.querySelectorAll('.exercise-item')].map(item => item.dataset.id);
             appData.exerciseOrder = newOrder;
             saveData();
-            baseExercises.sort((a, b) => appData.exerciseOrder.indexOf(a.id) - appData.exerciseOrder.indexOf(b.id));
 
             document.querySelectorAll('.drag-handle').forEach(handle => handle.classList.add('hidden'));
             document.querySelectorAll('.exercise-item').forEach(item => item.removeAttribute('draggable'));
             ui.orderBtn.classList.remove('hidden');
             ui.saveOrderBtn.classList.add('hidden');
+
+            renderSetupScreen();
+            calculateDailyGoals();
+            updateProgressDisplay();
         });
 
         let draggingElement = null;
