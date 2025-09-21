@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jornada do Guerreiro - Instituto Sanbao</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body class="text-white flex items-center justify-center min-h-screen p-4">
+    <div class="w-full max-w-2xl mx-auto p-4 sm:p-6 bg-gray-800 rounded-2xl shadow-2xl">
+
+        <!-- TELA DE CONFIGURAÇÃO -->
+        <div id="setup-screen">
+            <div class="flex justify-center items-center gap-2 mb-6">
+                <h1 class="text-2xl sm:text-3xl md:text-4xl font-black text-center text-indigo-400">Jornada do Guerreiro
+                </h1>
+                <button id="help-btn" class="text-gray-400 hover:text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="space-y-4 mb-6">
+                <!-- Seção Recolhível -->
+                <div class="bg-gray-700/50 rounded-lg">
+                    <button id="advanced-options-toggle" class="w-full text-left p-4 flex justify-between items-center">
+                        <h3 class="font-bold text-lg text-gray-200">Ver Painel Completo</h3>
+                        <svg id="advanced-options-arrow" xmlns="http://www.w3.org/2000/svg"
+                            class="h-6 w-6 transition-transform transform" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <div id="advanced-options-content" class="px-4 pb-4">
+                        <!-- Progresso Mensal -->
+                        <div class="bg-gray-900/50 p-4 rounded-lg mb-4">
+                            <div class="flex flex-col sm:flex-row justify-between items-center mb-3">
+                                <h3 class="font-bold text-lg text-gray-200 mb-2 sm:mb-0">Progresso Mensal</h3>
+                                <div class="flex gap-2">
+                                    <button id="history-btn"
+                                        class="text-sm bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md">Ver
+                                        Histórico</button>
+                                    <button id="add-retro-btn"
+                                        class="text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded-md">+
+                                        Treino Passado</button>
+                                </div>
+                            </div>
+                            <div id="monthly-progress-container" class="space-y-2 text-sm">
+                                <!-- Progresso será injetado aqui -->
+                            </div>
+                        </div>
+
+                        <!-- Metas Mensais -->
+                        <div class="bg-gray-900/50 p-4 rounded-lg">
+                            <h3 class="font-bold text-lg text-gray-200 mb-3">Editar Metas Mensais</h3>
+                            <div class="mb-4">
+                                <label class="block text-sm font-bold text-gray-300 mb-2">Dias no Mês</label>
+                                <div id="days-in-month-options"
+                                    class="flex items-center justify-around bg-gray-900 rounded-md p-1">
+                                    <label class="radio-label flex-1 text-center"><input type="radio"
+                                            name="days-in-month" value="28" class="hidden"><span
+                                            class="px-3 py-1 text-sm rounded-md cursor-pointer transition-colors block">28</span></label>
+                                    <label class="radio-label flex-1 text-center"><input type="radio"
+                                            name="days-in-month" value="29" class="hidden"><span
+                                            class="px-3 py-1 text-sm rounded-md cursor-pointer transition-colors block">29</span></label>
+                                    <label class="radio-label flex-1 text-center"><input type="radio"
+                                            name="days-in-month" value="30" class="hidden"><span
+                                            class="px-3 py-1 text-sm rounded-md cursor-pointer transition-colors block">30</span></label>
+                                    <label class="radio-label flex-1 text-center"><input type="radio"
+                                            name="days-in-month" value="31" class="hidden"><span
+                                            class="px-3 py-1 text-sm rounded-md cursor-pointer transition-colors block">31</span></label>
+                                </div>
+                            </div>
+                            <div id="monthly-goals-container" class="space-y-3">
+                                <!-- Metas mensais injetadas aqui -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Treino do Dia -->
+                <div class="bg-gray-700/50 p-4 rounded-lg">
+                    <h3 class="font-bold text-lg text-gray-200 mb-3">Treino do Dia</h3>
+                    <div class="space-y-4 border-b border-gray-600/50 pb-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-300 mb-2">Número de Séries</label>
+                            <div class="flex items-center justify-around bg-gray-900 rounded-md p-1">
+                                <label class="radio-label flex-1 text-center"><input type="radio" name="cycles"
+                                        value="1" class="hidden"><span
+                                        class="block px-3 py-1 text-sm rounded-md cursor-pointer transition-colors">1</span></label>
+                                <label class="radio-label flex-1 text-center"><input type="radio" name="cycles"
+                                        value="2" class="hidden"><span
+                                        class="block px-3 py-1 text-sm rounded-md cursor-pointer transition-colors">2</span></label>
+                                <label class="radio-label flex-1 text-center"><input type="radio" name="cycles"
+                                        value="3" class="hidden" checked><span
+                                        class="block px-3 py-1 text-sm rounded-md cursor-pointer transition-colors">3</span></label>
+                                <label class="radio-label flex-1 text-center"><input type="radio" name="cycles"
+                                        value="4" class="hidden"><span
+                                        class="block px-3 py-1 text-sm rounded-md cursor-pointer transition-colors">4</span></label>
+                                <label class="radio-label flex-1 text-center"><input type="radio" name="cycles"
+                                        value="5" class="hidden"><span
+                                        class="block px-3 py-1 text-sm rounded-md cursor-pointer transition-colors">5</span></label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-300 mb-2">Descanso entre Exercícios
+                                (s)</label>
+                            <div class="flex items-center justify-around bg-gray-900 rounded-md p-1">
+                                <label class="radio-label flex-1 text-center"><input type="radio" name="restTime"
+                                        value="15" class="hidden" checked><span
+                                        class="block px-3 py-1 text-sm rounded-md cursor-pointer transition-colors">15</span></label>
+                                <label class="radio-label flex-1 text-center"><input type="radio" name="restTime"
+                                        value="30" class="hidden"><span
+                                        class="block px-3 py-1 text-sm rounded-md cursor-pointer transition-colors">30</span></label>
+                                <label class="radio-label flex-1 text-center"><input type="radio" name="restTime"
+                                        value="45" class="hidden"><span
+                                        class="block px-3 py-1 text-sm rounded-md cursor-pointer transition-colors">45</span></label>
+                                <label class="radio-label flex-1 text-center"><input type="radio" name="restTime"
+                                        value="60" class="hidden"><span
+                                        class="block px-3 py-1 text-sm rounded-md cursor-pointer transition-colors">60</span></label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-300 mb-2">Descanso entre Séries (s)</label>
+                            <div class="flex items-center justify-around bg-gray-900 rounded-md p-1">
+                                <label class="radio-label flex-1 text-center"><input type="radio" name="seriesRestTime"
+                                        value="15" class="hidden"><span
+                                        class="block px-3 py-1 text-sm rounded-md cursor-pointer transition-colors">15</span></label>
+                                <label class="radio-label flex-1 text-center"><input type="radio" name="seriesRestTime"
+                                        value="30" class="hidden" checked><span
+                                        class="block px-3 py-1 text-sm rounded-md cursor-pointer transition-colors">30</span></label>
+                                <label class="radio-label flex-1 text-center"><input type="radio" name="seriesRestTime"
+                                        value="45" class="hidden"><span
+                                        class="block px-3 py-1 text-sm rounded-md cursor-pointer transition-colors">45</span></label>
+                                <label class="radio-label flex-1 text-center"><input type="radio" name="seriesRestTime"
+                                        value="60" class="hidden"><span
+                                        class="block px-3 py-1 text-sm rounded-md cursor-pointer transition-colors">60</span></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end mb-3">
+                        <button id="order-btn"
+                            class="text-sm bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md">Ordenar</button>
+                        <button id="save-order-btn"
+                            class="hidden text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded-md">Salvar
+                            Ordem</button>
+                    </div>
+
+                    <div id="exercise-selection-container" class="bg-gray-900/50 rounded-md p-1">
+                        <!-- Exercícios diários injetados aqui -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mb-4">
+                <p class="text-gray-400">Tempo Total Estimado: <span id="totalTime" class="font-bold text-indigo-300">0m
+                        00s</span></p>
+                <p id="validation-error" class="text-red-400 font-bold h-5 mt-1"></p>
+            </div>
+            <button id="start-btn"
+                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-4 rounded-lg text-xl transition-all transform hover:scale-105 shadow-lg">
+                Iniciar Treino
+            </button>
+        </div>
+
+        <!-- TELA DE TREINO -->
+        <div id="workout-screen" class="hidden text-center">
+            <p class="text-xl font-bold text-gray-400" id="series-display">Série 1 / 3</p>
+            <h2 class="text-3xl md:text-4xl font-black my-3 text-indigo-300" id="exercise-display">Preparar...</h2>
+
+            <div id="main-workout-display">
+                <div class="timer-container mx-auto my-6">
+                    <svg class="timer-svg">
+                        <circle cx="125" cy="125" r="115" stroke="#374151" stroke-width="15" fill="transparent" />
+                        <circle id="timer-progress-circle" cx="125" cy="125" r="115" stroke="#4f46e5" stroke-width="15"
+                            fill="transparent" stroke-dasharray="722" stroke-dashoffset="722" />
+                    </svg>
+                    <div class="timer-text">
+                        <p id="timer-value" class="text-7xl font-black">10</p>
+                        <div id="reps-container" class="hidden items-center justify-center">
+                            <button id="minus-rep-btn"
+                                class="text-5xl p-2 rounded-full w-16 h-16 flex items-center justify-center bg-gray-700 hover:bg-gray-600">-</button>
+                            <span id="reps-value" class="text-7xl font-black mx-4 w-28 text-center">0</span>
+                            <button id="plus-rep-btn"
+                                class="text-5xl p-2 rounded-full w-16 h-16 flex items-center justify-center bg-gray-700 hover:bg-gray-600">+</button>
+                        </div>
+                        <p id="timer-unit" class="text-lg text-gray-400">segundos</p>
+                    </div>
+                    <div id="pause-overlay" class="pause-overlay">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24 text-white" viewBox="0 0 20 20"
+                            fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                                clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="bg-gray-700/50 p-4 rounded-lg">
+                    <p class="text-sm font-bold text-gray-400 uppercase tracking-wider">A seguir</p>
+                    <p id="next-exercise-display" class="text-lg text-white font-semibold">-</p>
+                </div>
+            </div>
+
+            <div id="series-rest-display" class="hidden my-6">
+                <p id="series-rest-timer" class="text-7xl font-black">30</p>
+                <div class="w-full bg-gray-700 rounded-full h-4 mt-2">
+                    <div id="series-rest-progress-bar" class="bg-indigo-600 h-4 rounded-full"
+                        style="width: 100%; transition: width 1s linear;"></div>
+                </div>
+                <div id="partial-summary-container" class="text-left mt-6 bg-gray-700/50 p-4 rounded-lg">
+                    <h3 class="font-bold text-lg text-gray-200 mb-3 text-center">Resumo Parcial</h3>
+                    <div id="partial-summary-list" class="space-y-2"></div>
+                </div>
+            </div>
+
+
+            <div class="flex justify-center gap-2 sm:gap-4 mt-8">
+                <button id="pause-resume-btn"
+                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 sm:px-8 rounded-full transition-all">Pausar</button>
+                <button id="skip-btn"
+                    class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-6 sm:px-8 rounded-full transition-all">Pular</button>
+                <button id="end-btn"
+                    class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 sm:px-8 rounded-full transition-all">Encerrar</button>
+            </div>
+        </div>
+
+        <!-- TELA FINAL -->
+        <div id="finished-screen" class="hidden text-center">
+            <h1 class="text-4xl font-black text-indigo-400 mb-4" id="finished-title">Treino Concluído!</h1>
+            <p class="text-gray-300 mb-6 text-lg" id="finished-subtitle">Você mandou bem! Continue com o ótimo trabalho.
+            </p>
+
+            <div id="summary-container" class="bg-gray-700/50 p-4 rounded-lg text-left mb-6">
+                <h3 class="font-bold text-lg text-gray-200 mb-3 text-center">Resumo da Sessão</h3>
+                <div id="summary-list" class="space-y-2"></div>
+            </div>
+
+            <button id="restart-btn"
+                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-4 rounded-lg text-xl transition-all transform hover:scale-105 shadow-lg">
+                Treinar Novamente
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL DE AJUDA -->
+    <div id="help-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-lg w-full text-left">
+            <h2 class="text-2xl font-bold text-indigo-400 mb-4">Como Usar o Aplicativo</h2>
+            <div class="space-y-3 text-gray-300">
+                <p><strong>1. Metas Mensais:</strong> Defina seus objetivos totais para o mês e informe o número de dias
+                    do mês.</p>
+                <p><strong>2. Treino do Dia:</strong> O aplicativo calcula sua meta diária automaticamente. Você pode
+                    editar os valores se quiser.</p>
+                <p><strong>3. Iniciar:</strong> Clique em "Iniciar Treino" para começar.</p>
+                <p><strong>4. Durante o Treino:</strong>
+                <ul class="list-disc list-inside ml-4">
+                    <li><strong>Exercícios de Tempo:</strong> O cronômetro conta automaticamente.</li>
+                    <li><strong>Exercícios de Repetição:</strong> Use "+" e "-" para registrar o quanto você fez e
+                        clique em "Pronto".</li>
+                </ul>
+                </p>
+                <p><strong>5. Resumo:</strong> Ao final, um resumo detalhado do seu treino será exibido para você
+                    acompanhar seu progresso.</p>
+            </div>
+            <button id="close-help-btn"
+                class="mt-6 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">
+                Entendi!
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL DE TREINO RETROATIVO -->
+    <div id="retro-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-lg w-full text-left">
+            <h2 class="text-2xl font-bold text-indigo-400 mb-4">Adicionar Treino Passado</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="retro-date" class="block text-sm font-bold text-gray-300 mb-2">Data do Treino</label>
+                    <input type="date" id="retro-date"
+                        class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div id="retro-exercise-inputs" class="space-y-2">
+                    <!-- Inputs para exercícios retroativos -->
+                </div>
+            </div>
+            <div class="flex gap-4 mt-6">
+                <button id="cancel-retro-btn"
+                    class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+                    Cancelar
+                </button>
+                <button type="button" id="save-retro-btn"
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">
+                    Salvar Treino
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE HISTÓRICO -->
+    <div id="history-modal"
+        class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-lg w-full text-left max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-indigo-400">Histórico de Treinos</h2>
+                <select id="history-month-select"
+                    class="bg-gray-900 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <!-- Opções de mês serão injetadas aqui -->
+                </select>
+            </div>
+            <div id="history-list" class="space-y-4 overflow-y-auto pr-2 flex-grow">
+                <!-- Histórico será injetado aqui -->
+            </div>
+            <div class="flex gap-4 mt-6">
+                <button id="clear-history-btn"
+                    class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">
+                    Limpar Histórico do Mês
+                </button>
+                <button id="close-history-btn"
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="js/app.js"></script>
+</body>
+
+</html>
