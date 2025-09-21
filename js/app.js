@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const screens = {
         setup: document.getElementById('setup-screen'),
         workout: document.getElementById('workout-screen'),
@@ -56,6 +56,80 @@ document.addEventListener('DOMContentLoaded', () => {
         advancedOptionsToggle: document.getElementById('advanced-options-toggle'),
         advancedOptionsContent: document.getElementById('advanced-options-content'),
         advancedOptionsArrow: document.getElementById('advanced-options-arrow'),
+        confirmModal: document.getElementById('confirm-modal'),
+        confirmTitle: document.getElementById('confirm-title'),
+        confirmMessage: document.getElementById('confirm-message'),
+        confirmConfirmBtn: document.getElementById('confirm-confirm-btn'),
+        confirmCancelBtn: document.getElementById('confirm-cancel-btn'),
+    };
+
+    const showConfirmation = ({
+        title = 'Confirmação',
+        message = '',
+        confirmText = 'Confirmar',
+        cancelText = 'Cancelar',
+        variant = 'primary'
+    } = {}) => {
+        return new Promise((resolve) => {
+            const modal = ui.confirmModal;
+            const confirmBtn = ui.confirmConfirmBtn;
+            const cancelBtn = ui.confirmCancelBtn;
+
+            if (!modal || !confirmBtn || !cancelBtn) {
+                resolve(window.confirm(message || title));
+                return;
+            }
+
+            if (ui.confirmTitle) ui.confirmTitle.textContent = title;
+            if (ui.confirmMessage) ui.confirmMessage.textContent = message;
+            confirmBtn.textContent = confirmText;
+            cancelBtn.textContent = cancelText;
+
+            confirmBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700', 'focus:ring-indigo-500', 'bg-red-600', 'hover:bg-red-700', 'focus:ring-red-500');
+            if (variant === 'danger') {
+                confirmBtn.classList.add('bg-red-600', 'hover:bg-red-700', 'focus:ring-red-500');
+            } else {
+                confirmBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700', 'focus:ring-indigo-500');
+            }
+
+            const cleanup = () => {
+                modal.classList.add('hidden');
+                confirmBtn.removeEventListener('click', handleConfirm);
+                cancelBtn.removeEventListener('click', handleCancel);
+                modal.removeEventListener('click', handleOverlayClick);
+                document.removeEventListener('keydown', handleKeyDown);
+            };
+
+            const handleConfirm = () => {
+                cleanup();
+                resolve(true);
+            };
+
+            const handleCancel = () => {
+                cleanup();
+                resolve(false);
+            };
+
+            const handleOverlayClick = (event) => {
+                if (event.target === modal) {
+                    handleCancel();
+                }
+            };
+
+            const handleKeyDown = (event) => {
+                if (event.key === 'Escape') {
+                    handleCancel();
+                }
+            };
+
+            confirmBtn.addEventListener('click', handleConfirm);
+            cancelBtn.addEventListener('click', handleCancel);
+            modal.addEventListener('click', handleOverlayClick);
+            document.addEventListener('keydown', handleKeyDown);
+
+            modal.classList.remove('hidden');
+            setTimeout(() => confirmBtn.focus(), 0);
+        });
     };
 
     let baseExercises = [
@@ -108,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('jornadaGuerreiroData', JSON.stringify(appData));
     };
 
-    const loadData = () => {
+    const loadData = async () => {
         const savedData = localStorage.getItem('jornadaGuerreiroData');
         const today = new Date();
         const currentMonth = today.getMonth() + 1;
@@ -126,7 +200,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const hasValidChallenge = appData.currentChallenge && appData.currentChallenge.year && appData.currentChallenge.month;
 
                 if (hasOldHistory && hasValidChallenge) {
-                    if (confirm('Novo mês detectado! Deseja arquivar o desafio anterior e iniciar um novo?')) {
+                    const shouldArchive = await showConfirmation({
+                        title: 'Novo mês detectado',
+                        message: 'Deseja arquivar o desafio anterior e iniciar um novo?',
+                        confirmText: 'Arquivar e iniciar',
+                        cancelText: 'Manter desafio atual'
+                    });
+                    if (shouldArchive) {
                         if (!appData.archive) appData.archive = {};
                         const archiveKey = `${appData.currentChallenge.year}-${String(appData.currentChallenge.month).padStart(2, '0')}`;
                         appData.archive[archiveKey] = {
@@ -775,8 +855,15 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.restartBtn.addEventListener('click', resetWorkout);
         ui.pauseResumeBtn.addEventListener('click', togglePause);
         ui.skipBtn.addEventListener('click', handleSkipOrDone);
-        ui.endBtn.addEventListener('click', () => {
-            if (confirm('Tem certeza que deseja encerrar o treino? Seu progresso até aqui será salvo.')) {
+        ui.endBtn.addEventListener('click', async () => {
+            const shouldEnd = await showConfirmation({
+                title: 'Encerrar treino?',
+                message: 'Tem certeza que deseja encerrar o treino? Seu progresso até aqui será salvo.',
+                confirmText: 'Encerrar treino',
+                cancelText: 'Continuar',
+                variant: 'danger'
+            });
+            if (shouldEnd) {
                 endWorkout(false);
             }
         });
@@ -857,9 +944,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateProgressDisplay();
             }
         });
-        ui.clearHistoryBtn.addEventListener('click', () => {
+        ui.clearHistoryBtn.addEventListener('click', async () => {
             const archiveKey = ui.historyMonthSelect.value;
-            if (confirm(`Todo o histórico de ${archiveKey} será excluído, tem certeza?`)) {
+            const [selectedYear, selectedMonth] = archiveKey.split('-');
+            const formattedKey = (selectedMonth && selectedYear) ? `${selectedMonth}/${selectedYear}` : archiveKey;
+            const shouldClear = await showConfirmation({
+                title: 'Limpar histórico',
+                message: `Todo o histórico de ${formattedKey} será excluído. Deseja continuar?`,
+                confirmText: 'Limpar histórico',
+                cancelText: 'Cancelar',
+                variant: 'danger'
+            });
+            if (shouldClear) {
                 if (archiveKey === `${appData.currentChallenge.year}-${String(appData.currentChallenge.month).padStart(2, '0')}`) {
                     appData.history = {};
                 } else if (appData.archive && appData.archive[archiveKey]) {
@@ -876,14 +972,21 @@ document.addEventListener('DOMContentLoaded', () => {
             renderHistory(e.target.value);
         });
 
-        ui.historyList.addEventListener('click', (e) => {
+        ui.historyList.addEventListener('click', async (e) => {
             const deleteBtn = e.target.closest('.delete-history-entry');
             if (!deleteBtn) return;
 
             const { date, index } = deleteBtn.dataset;
             if (!date || !index) return;
 
-            if (confirm('Este treino será excluído, tem certeza?')) {
+            const shouldDelete = await showConfirmation({
+                title: 'Excluir treino',
+                message: 'Este treino será excluído, tem certeza?',
+                confirmText: 'Excluir',
+                cancelText: 'Cancelar',
+                variant: 'danger'
+            });
+            if (shouldDelete) {
                 const archiveKey = ui.historyMonthSelect.value;
                 const isCurrentMonth = archiveKey === `${appData.currentChallenge.year}-${String(appData.currentChallenge.month).padStart(2, '0')}`;
 
@@ -1068,7 +1171,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    loadData();
+    await loadData();
     renderSetupScreen();
     addEventListeners();
     applySavedDailySettings();
