@@ -26,6 +26,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         exerciseSelectionContainer: document.getElementById('exercise-selection-container'),
         monthlyGoalsContainer: document.getElementById('monthly-goals-container'),
         monthlyProgressContainer: document.getElementById('monthly-progress-container'),
+        monthlyOverviewDays: document.getElementById('monthly-overview-days'),
+        monthlyOverviewCompleted: document.getElementById('monthly-overview-completed'),
+        monthlyOverviewRemaining: document.getElementById('monthly-overview-remaining'),
         validationError: document.getElementById('validation-error'),
         finishedTitle: document.getElementById('finished-title'),
         finishedSubtitle: document.getElementById('finished-subtitle'),
@@ -503,6 +506,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         exercises.forEach(ex => monthlyTotals[ex.id] = 0);
 
         const trainingDays = Object.keys(appData.history).length;
+        const selectedDaysRadio = document.querySelector('input[name="days-in-month"]:checked');
+        const totalDaysInMonth = selectedDaysRadio ? parseInt(selectedDaysRadio.value, 10) : 31;
 
         for (const date in appData.history) {
             if (Array.isArray(appData.history[date])) {
@@ -516,11 +521,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
+        let completedExercises = 0;
         exercises.forEach(ex => {
             const goal = appData.monthlyGoals[ex.id] || ex.monthlyGoal || 0;
             const done = monthlyTotals[ex.id] || 0;
             const remaining = goal - done;
             const average = trainingDays > 0 ? Math.ceil(done / trainingDays) : 0;
+            if (goal > 0 && done >= goal) {
+                completedExercises++;
+            }
             const progressEl = document.createElement('div');
             progressEl.innerHTML = `
                 <div class="flex flex-col sm:flex-row justify-between sm:items-center text-gray-300">
@@ -534,6 +543,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
             ui.monthlyProgressContainer.appendChild(progressEl);
         });
+
+        if (ui.monthlyOverviewDays) {
+            ui.monthlyOverviewDays.textContent = trainingDays;
+        }
+
+        if (ui.monthlyOverviewCompleted) {
+            ui.monthlyOverviewCompleted.textContent = `${completedExercises}/${exercises.length}`;
+        }
+
+        if (ui.monthlyOverviewRemaining) {
+            let daysRemaining = totalDaysInMonth;
+            const challenge = appData.currentChallenge || {};
+            const today = new Date();
+            if (
+                typeof challenge.year === 'number' &&
+                typeof challenge.month === 'number' &&
+                today.getFullYear() === challenge.year &&
+                today.getMonth() + 1 === challenge.month
+            ) {
+                const currentDay = Math.min(today.getDate(), totalDaysInMonth);
+                daysRemaining = Math.max(totalDaysInMonth - currentDay, 0);
+            } else {
+                daysRemaining = Math.max(totalDaysInMonth - trainingDays, 0);
+            }
+            ui.monthlyOverviewRemaining.textContent = daysRemaining;
+        }
     };
 
     const renderSetupScreen = () => {
@@ -1152,7 +1187,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         document.querySelectorAll('input[name="days-in-month"]').forEach(radio => {
-            radio.addEventListener('change', calculateDailyGoals);
+            radio.addEventListener('change', () => {
+                calculateDailyGoals();
+                updateProgressDisplay();
+            });
         });
         document.querySelectorAll('input[name="cycles"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
