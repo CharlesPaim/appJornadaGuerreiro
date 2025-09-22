@@ -261,9 +261,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (shouldArchive) {
                         if (!appData.archive) appData.archive = {};
                         const archiveKey = `${appData.currentChallenge.year}-${String(appData.currentChallenge.month).padStart(2, '0')}`;
+
+                        const cloneData = (value, fallback = {}) => {
+                            const source = value ?? fallback;
+                            if (typeof structuredClone === 'function') {
+                                try {
+                                    return structuredClone(source);
+                                } catch (error) {
+                                    console.warn('structuredClone failed, falling back to JSON clone.', error);
+                                }
+                            }
+                            return JSON.parse(JSON.stringify(source));
+                        };
+
                         appData.archive[archiveKey] = {
-                            monthlyGoals: appData.monthlyGoals,
-                            history: appData.history
+                            monthlyGoals: cloneData(appData.monthlyGoals, {}),
+                            history: cloneData(appData.history, {})
                         };
                         appData.history = {};
                         dataChanged = true;
